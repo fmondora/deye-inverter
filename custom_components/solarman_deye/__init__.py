@@ -56,6 +56,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     try:
         await v5_server.start()
+        coordinator.enable_push_mode()
     except OSError as err:
         _LOGGER.warning(
             "Could not start V5 passive server on port %s: %s — "

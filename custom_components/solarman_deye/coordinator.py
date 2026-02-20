@@ -72,11 +72,21 @@ class SolarmanDeyeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._device_info_read = False
         # Registers received via the passive V5 server (push mode).
         self._pushed_registers: dict[int, int] | None = None
+        self._push_mode = False
+
+    def enable_push_mode(self) -> None:
+        """Disable direct polling — data comes via the V5 server."""
+        self._push_mode = True
+        _LOGGER.info("Push mode enabled — direct polling disabled")
 
     def receive_pushed_data(self, regs: dict[int, int]) -> None:
         """Called by the V5 server when new register data is pushed."""
         self._pushed_registers = regs
         _LOGGER.debug("Stored %d pushed registers for next update", len(regs))
+        # Trigger an immediate coordinator refresh so sensors update fast.
+        self.hass.loop.call_soon_threadsafe(
+            self.hass.async_create_task, self.async_request_refresh()
+        )
 
     # ------------------------------------------------------------------
     # Connection helpers
@@ -273,17 +283,20 @@ class SolarmanDeyeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.debug("Using %d registers from push server", len(regs))
             return self._parse(regs)
 
+        # In push mode, don't try direct polling — just keep last data.
+        if self._push_mode:
+            if self.data:
+                return self.data
+            return {}
+
         # Fall back to direct polling.
         try:
             regs = await self.hass.async_add_executor_job(self._read_registers)
         except Exception as err:
             self._client = None
-            # If we have never had a successful read, return empty data so
-            # that the first refresh succeeds and entities are created.
-            # They will show 'Unknown' until the inverter wakes up.
             if self.data is None:
                 _LOGGER.warning(
-                    "Inverter not responding (probably standby / cloud busy) — "
+                    "Inverter not responding (cloud busy) — "
                     "sensors will update when data arrives: %s", err,
                 )
                 return {}

@@ -16,7 +16,7 @@ def test_scan_parses_response():
     """Test that a valid UDP response is parsed into a DiscoveredDevice."""
     mock_sock = MagicMock()
     responses = [
-        (b"192.168.86.69,AA:BB:CC:DD:EE:FF,2504221369", ("192.168.86.69", DISCOVERY_PORT)),
+        (b"192.168.86.69,AA:BB:CC:DD:EE:FF,3168688670", ("192.168.86.69", DISCOVERY_PORT)),
     ]
 
     def _recvfrom(bufsize):
@@ -31,7 +31,7 @@ def test_scan_parses_response():
         devices = scan_network(timeout=1.0)
 
     assert len(devices) == 1
-    assert devices[0] == DiscoveredDevice(ip="192.168.86.69", mac="AA:BB:CC:DD:EE:FF", serial=2504221369)
+    assert devices[0] == DiscoveredDevice(ip="192.168.86.69", mac="AA:BB:CC:DD:EE:FF", serial=3168688670)
     mock_sock.sendto.assert_called_once_with(DISCOVERY_MESSAGE, ("255.255.255.255", DISCOVERY_PORT))
 
 

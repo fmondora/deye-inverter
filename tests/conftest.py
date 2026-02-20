@@ -18,7 +18,7 @@ from custom_components.solarman_deye.const import (
 )
 
 MOCK_HOST = "192.168.86.69"
-MOCK_SERIAL = 2504221369
+MOCK_SERIAL = 3168688670
 MOCK_CONFIG = {
     CONF_HOST: MOCK_HOST,
     CONF_SERIAL: MOCK_SERIAL,

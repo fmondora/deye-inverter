@@ -18,7 +18,7 @@ class TestReadInverterConfig:
         return SolarmanDeyeCoordinator(
             hass,
             host="192.168.86.69",
-            serial=2504221369,
+            serial=3168688670,
             port=8899,
             slave_id=1,
         )

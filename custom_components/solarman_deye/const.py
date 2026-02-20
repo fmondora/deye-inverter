@@ -36,6 +36,24 @@ CO2_SENSORS = [
 ]
 
 # ---------------------------------------------------------------------------
+# Battery cycle tracking
+# ---------------------------------------------------------------------------
+
+# Nominal battery capacity in kWh.  Common Deye-compatible packs: 5.12 kWh.
+CONF_BATTERY_CAPACITY = "battery_capacity"
+DEFAULT_BATTERY_CAPACITY = 5.12
+
+# Rated cycle life of the battery.  LiFePO4 packs are typically rated 6000 cycles.
+CONF_BATTERY_RATED_CYCLES = "battery_rated_cycles"
+DEFAULT_BATTERY_RATED_CYCLES = 6000
+
+# Computed battery sensors: (name, unit, state_class, precision, icon)
+BATTERY_CYCLE_SENSORS = [
+    ("Battery Cycles", "cycles", SensorStateClass.TOTAL_INCREASING, 1, "mdi:battery-sync"),
+    ("Battery Health", PERCENTAGE, SensorStateClass.MEASUREMENT, 1, "mdi:battery-heart-variant"),
+]
+
+# ---------------------------------------------------------------------------
 # Modbus register map for Deye single-phase hybrid inverters
 # Each entry: (register, name, unit, device_class, state_class, scale, precision, signed)
 # ---------------------------------------------------------------------------

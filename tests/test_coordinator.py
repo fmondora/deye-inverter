@@ -132,3 +132,42 @@ class TestParse:
     def test_total_co2_saved(self, parsed):
         # 100.0 kWh * 0.256 = 25.6
         assert parsed["Total CO2 Saved"] == pytest.approx(25.6, abs=0.1)
+
+    # --- Battery cycles ---
+    def test_battery_cycles(self, parsed):
+        # Total Battery Discharge Energy: low=400, high=0 → 400 * 0.1 = 40.0 kWh
+        # Default capacity = 5.12 kWh → 40.0 / 5.12 = 7.8125 → rounded 7.8
+        assert parsed["Battery Cycles"] == pytest.approx(7.8, abs=0.1)
+
+    def test_battery_health(self, parsed):
+        # cycles ≈ 7.8, rated = 6000 → health = 100 * (1 - 7.8/6000) ≈ 99.9%
+        assert parsed["Battery Health"] == pytest.approx(99.9, abs=0.1)
+
+
+class TestBatteryCyclesCustomCapacity:
+    """Verify battery cycle calculation with a custom capacity."""
+
+    @pytest.fixture
+    def coordinator(self, hass, mock_solarman):
+        return SolarmanDeyeCoordinator(
+            hass,
+            host="192.168.86.69",
+            serial=2504221369,
+            port=8899,
+            slave_id=1,
+            battery_capacity=10.0,
+            battery_rated_cycles=3000,
+        )
+
+    @pytest.fixture
+    def parsed(self, coordinator, mock_solarman):
+        regs = coordinator._read_registers()
+        return coordinator._parse(regs)
+
+    def test_cycles_with_larger_battery(self, parsed):
+        # 40.0 kWh / 10.0 kWh = 4.0 cycles
+        assert parsed["Battery Cycles"] == 4.0
+
+    def test_health_with_lower_rated_cycles(self, parsed):
+        # 4.0 / 3000 → health = 100 * (1 - 4/3000) ≈ 99.9
+        assert parsed["Battery Health"] == pytest.approx(99.9, abs=0.1)

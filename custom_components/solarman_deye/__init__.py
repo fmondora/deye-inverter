@@ -8,7 +8,19 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, Platform
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_CO2_FACTOR, CONF_PORT, CONF_SERIAL, CONF_SLAVE_ID, DEFAULT_CO2_FACTOR, DEFAULT_SCAN_INTERVAL, DOMAIN
+from .const import (
+    CONF_BATTERY_CAPACITY,
+    CONF_BATTERY_RATED_CYCLES,
+    CONF_CO2_FACTOR,
+    CONF_PORT,
+    CONF_SERIAL,
+    CONF_SLAVE_ID,
+    DEFAULT_BATTERY_CAPACITY,
+    DEFAULT_BATTERY_RATED_CYCLES,
+    DEFAULT_CO2_FACTOR,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+)
 from .coordinator import SolarmanDeyeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -26,6 +38,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         slave_id=entry.data[CONF_SLAVE_ID],
         scan_interval=entry.options.get("scan_interval", DEFAULT_SCAN_INTERVAL),
         co2_factor=entry.options.get(CONF_CO2_FACTOR, DEFAULT_CO2_FACTOR),
+        battery_capacity=entry.options.get(CONF_BATTERY_CAPACITY, DEFAULT_BATTERY_CAPACITY),
+        battery_rated_cycles=entry.options.get(CONF_BATTERY_RATED_CYCLES, DEFAULT_BATTERY_RATED_CYCLES),
     )
 
     await coordinator.async_config_entry_first_refresh()

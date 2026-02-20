@@ -10,6 +10,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
+    BATTERY_CYCLE_SENSORS,
     CO2_SENSORS,
     CONF_SERIAL,
     DOMAIN,
@@ -80,8 +81,8 @@ async def async_setup_entry(
             )
         )
 
-    # --- CO2 sensors ---
-    for name, unit, state_class, precision, icon in CO2_SENSORS:
+    # --- CO2 and battery cycle sensors ---
+    for name, unit, state_class, precision, icon in CO2_SENSORS + BATTERY_CYCLE_SENSORS:
         entities.append(
             SolarmanDeyeSensor(
                 coordinator=coordinator,

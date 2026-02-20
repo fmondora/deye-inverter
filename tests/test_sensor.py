@@ -6,6 +6,7 @@ import pytest
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import (
+    PERCENTAGE,
     UnitOfElectricPotential,
     UnitOfEnergy,
     UnitOfPower,
@@ -120,3 +121,32 @@ class TestSolarmanDeyeSensor:
         coordinator.data = {"PV1 Power": 1925}
         sensor._update_native_value()
         assert sensor.native_value == 1925
+
+    def test_battery_cycles_sensor(self, coordinator):
+        sensor = SolarmanDeyeSensor(
+            coordinator=coordinator,
+            serial=MOCK_SERIAL,
+            name="Battery Cycles",
+            unit="cycles",
+            device_class=None,
+            state_class=SensorStateClass.TOTAL_INCREASING,
+            precision=1,
+            icon="mdi:battery-sync",
+        )
+        assert sensor.icon == "mdi:battery-sync"
+        assert sensor.state_class is SensorStateClass.TOTAL_INCREASING
+
+    def test_battery_health_sensor(self, coordinator):
+        sensor = SolarmanDeyeSensor(
+            coordinator=coordinator,
+            serial=MOCK_SERIAL,
+            name="Battery Health",
+            unit=PERCENTAGE,
+            device_class=None,
+            state_class=SensorStateClass.MEASUREMENT,
+            precision=1,
+            icon="mdi:battery-heart-variant",
+        )
+        coordinator.data = {"Battery Health": 99.9}
+        sensor._update_native_value()
+        assert sensor.native_value == 99.9

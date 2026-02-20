@@ -25,7 +25,9 @@
         "title": "Solarman Deye Options",
         "data": {
           "scan_interval": "Update interval (seconds)",
-          "co2_factor": "CO2 emission factor (kg CO2/kWh)"
+          "co2_factor": "CO2 emission factor (kg CO2/kWh)",
+          "battery_capacity": "Battery capacity (kWh)",
+          "battery_rated_cycles": "Battery rated cycle life"
         }
       }
     }

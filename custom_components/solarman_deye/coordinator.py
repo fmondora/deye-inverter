@@ -12,6 +12,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
+    DEFAULT_BATTERY_CAPACITY,
+    DEFAULT_BATTERY_RATED_CYCLES,
     DEFAULT_CO2_FACTOR,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
@@ -43,6 +45,8 @@ class SolarmanDeyeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         slave_id: int,
         scan_interval: int = DEFAULT_SCAN_INTERVAL,
         co2_factor: float = DEFAULT_CO2_FACTOR,
+        battery_capacity: float = DEFAULT_BATTERY_CAPACITY,
+        battery_rated_cycles: int = DEFAULT_BATTERY_RATED_CYCLES,
     ) -> None:
         """Initialise the coordinator."""
         super().__init__(
@@ -56,6 +60,8 @@ class SolarmanDeyeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._port = port
         self._slave_id = slave_id
         self._co2_factor = co2_factor
+        self._battery_capacity = battery_capacity
+        self._battery_rated_cycles = battery_rated_cycles
         self._client: PySolarmanV5 | None = None
 
     # ------------------------------------------------------------------
@@ -179,6 +185,15 @@ class SolarmanDeyeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         total_pv = data.get("Total PV Energy")
         if total_pv is not None:
             data["Total CO2 Saved"] = round(total_pv * co2, 1)
+
+        # --- Battery cycle tracking ---
+        total_discharge = data.get("Total Battery Discharge Energy")
+        if total_discharge is not None and self._battery_capacity > 0:
+            cycles = total_discharge / self._battery_capacity
+            data["Battery Cycles"] = round(cycles, 1)
+            # Health: 100% at 0 cycles, 0% at rated cycle life
+            health = max(0.0, 100.0 * (1 - cycles / self._battery_rated_cycles))
+            data["Battery Health"] = round(health, 1)
 
         return data
 

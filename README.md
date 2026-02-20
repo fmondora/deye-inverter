@@ -9,6 +9,7 @@ Custom integration for Home Assistant that reads **all available data** from Dey
 
 - **~40 sensors**: PV, battery, grid, load, inverter, temperatures, daily/total energy, status
 - **CO2 savings tracking**: daily and total CO2 avoided thanks to solar production (Italian grid default, configurable)
+- **Battery cycle tracking**: equivalent full charge cycles and estimated battery health percentage
 - **Energy Dashboard ready**: all energy sensors use `TOTAL_INCREASING` state class for seamless integration
 - **Config flow UI**: set up entirely from the Home Assistant interface
 - **Efficient polling**: reads Modbus registers in contiguous blocks (2 reads per cycle)
@@ -28,6 +29,7 @@ Custom integration for Home Assistant that reads **all available data** from Dey
 | **Total Energy** | PV, Battery Charge/Discharge, Grid Import/Export, Load |
 | **Status** | Running State, Grid Connected, Daily Active Energy |
 | **CO2** | Daily CO2 Saved, Total CO2 Saved |
+| **Battery Cycles** | Battery Cycles, Battery Health |
 
 ## Installation via HACS
 
@@ -57,6 +59,8 @@ After setup, click **Configure** on the integration to change:
 
 - **Update interval** (default: 30 seconds)
 - **CO2 emission factor** (default: 0.256 kg CO2/kWh - Italian grid average, ISPRA)
+- **Battery capacity** (default: 5.12 kWh) - used to compute equivalent full cycles
+- **Battery rated cycle life** (default: 6000 for LiFePO4) - used to estimate battery health %
 
 ## Energy Dashboard
 

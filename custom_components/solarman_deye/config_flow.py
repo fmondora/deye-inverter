@@ -14,10 +14,14 @@ from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 
 from .const import (
+    CONF_BATTERY_CAPACITY,
+    CONF_BATTERY_RATED_CYCLES,
     CONF_CO2_FACTOR,
     CONF_PORT,
     CONF_SERIAL,
     CONF_SLAVE_ID,
+    DEFAULT_BATTERY_CAPACITY,
+    DEFAULT_BATTERY_RATED_CYCLES,
     DEFAULT_CO2_FACTOR,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
@@ -122,6 +126,18 @@ class SolarmanDeyeOptionsFlow(OptionsFlow):
                             CONF_CO2_FACTOR, DEFAULT_CO2_FACTOR
                         ),
                     ): vol.All(vol.Coerce(float), vol.Range(min=0.01, max=2.0)),
+                    vol.Optional(
+                        CONF_BATTERY_CAPACITY,
+                        default=self._config_entry.options.get(
+                            CONF_BATTERY_CAPACITY, DEFAULT_BATTERY_CAPACITY
+                        ),
+                    ): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=100.0)),
+                    vol.Optional(
+                        CONF_BATTERY_RATED_CYCLES,
+                        default=self._config_entry.options.get(
+                            CONF_BATTERY_RATED_CYCLES, DEFAULT_BATTERY_RATED_CYCLES
+                        ),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=100, max=20000)),
                 }
             ),
         )

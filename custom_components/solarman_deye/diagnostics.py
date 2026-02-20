@@ -36,21 +36,27 @@ def _redact(data: dict[str, Any]) -> dict[str, Any]:
 
 def _read_inverter_config(coordinator: SolarmanDeyeCoordinator) -> dict[str, Any]:
     """Read holding registers and return decoded configuration (blocking)."""
-    client = coordinator._ensure_client()
+    client = coordinator._new_client()
     config: dict[str, Any] = {}
 
-    for start, count in HOLDING_READ_BLOCKS:
+    try:
+        for start, count in HOLDING_READ_BLOCKS:
+            try:
+                values = client.read_holding_registers(
+                    register_addr=start, quantity=count
+                )
+            except Exception:  # noqa: BLE001
+                continue
+            for i, val in enumerate(values):
+                reg = start + i
+                label = HOLDING_REGISTER_LABELS.get(reg)
+                if label is not None:
+                    config[label] = val
+    finally:
         try:
-            values = client.read_holding_registers(
-                register_addr=start, quantity=count
-            )
+            client.disconnect()
         except Exception:  # noqa: BLE001
-            continue
-        for i, val in enumerate(values):
-            reg = start + i
-            label = HOLDING_REGISTER_LABELS.get(reg)
-            if label is not None:
-                config[label] = val
+            pass
 
     # Decode well-known enumerated values
     if "Work mode" in config:

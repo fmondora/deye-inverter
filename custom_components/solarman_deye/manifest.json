@@ -1,0 +1,11 @@
+{
+  "domain": "solarman_deye",
+  "name": "Solarman Deye",
+  "codeowners": ["@fmondora"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "",
+  "iot_class": "local_polling",
+  "requirements": ["pysolarmanv5>=3.0.0"],
+  "version": "1.0.0"
+}

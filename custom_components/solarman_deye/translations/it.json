@@ -1,0 +1,33 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Inverter Solarman Deye",
+        "description": "Inserisci i dati di connessione del tuo data logger Solarman.",
+        "data": {
+          "host": "Indirizzo IP",
+          "serial_number": "Numero di serie",
+          "port": "Porta",
+          "slave_id": "Slave ID Modbus"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossibile connettersi al data logger. Controlla IP, numero di serie e porta."
+    },
+    "abort": {
+      "already_configured": "Questo dispositivo \u00e8 gi\u00e0 configurato."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opzioni Solarman Deye",
+        "data": {
+          "scan_interval": "Intervallo di aggiornamento (secondi)",
+          "co2_factor": "Fattore emissione CO2 (kg CO2/kWh)"
+        }
+      }
+    }
+  }
+}

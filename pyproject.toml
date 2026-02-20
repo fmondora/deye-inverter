@@ -1,0 +1,13 @@
+[project]
+name = "ha-solarman-deye"
+version = "1.0.0"
+description = "Home Assistant custom integration for Deye inverters via Solarman V5"
+license = "MIT"
+authors = [
+    { name = "Francesco Mondora" },
+]
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

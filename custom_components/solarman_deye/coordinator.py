@@ -1,0 +1,207 @@
+"""DataUpdateCoordinator for Solarman Deye."""
+
+from __future__ import annotations
+
+import logging
+from datetime import timedelta
+from typing import Any
+
+from pysolarmanv5 import PySolarmanV5
+
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+
+from .const import (
+    DEFAULT_CO2_FACTOR,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    READ_BLOCKS,
+    REGISTERS_BATTERY,
+    REGISTERS_ENERGY_DAILY,
+    REGISTERS_ENERGY_TOTAL,
+    REGISTERS_GRID,
+    REGISTERS_INVERTER,
+    REGISTERS_LOAD,
+    REGISTERS_PV,
+    REGISTERS_STATUS,
+    REGISTERS_TEMPERATURE,
+    RUNNING_STATES,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+
+class SolarmanDeyeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
+    """Coordinator that polls the Solarman data logger."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        host: str,
+        serial: int,
+        port: int,
+        slave_id: int,
+        scan_interval: int = DEFAULT_SCAN_INTERVAL,
+        co2_factor: float = DEFAULT_CO2_FACTOR,
+    ) -> None:
+        """Initialise the coordinator."""
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=DOMAIN,
+            update_interval=timedelta(seconds=scan_interval),
+        )
+        self._host = host
+        self._serial = serial
+        self._port = port
+        self._slave_id = slave_id
+        self._co2_factor = co2_factor
+        self._client: PySolarmanV5 | None = None
+
+    # ------------------------------------------------------------------
+    # Connection helpers
+    # ------------------------------------------------------------------
+
+    def _connect(self) -> PySolarmanV5:
+        """Create and return a PySolarmanV5 client (blocking)."""
+        if self._client is not None:
+            try:
+                self._client.disconnect()
+            except Exception:  # noqa: BLE001
+                pass
+        client = PySolarmanV5(
+            self._host,
+            self._serial,
+            port=self._port,
+            mb_slave_id=self._slave_id,
+            auto_reconnect=True,
+            socket_timeout=10,
+        )
+        return client
+
+    def _ensure_client(self) -> PySolarmanV5:
+        if self._client is None:
+            self._client = self._connect()
+        return self._client
+
+    # ------------------------------------------------------------------
+    # Data reading (runs in executor)
+    # ------------------------------------------------------------------
+
+    def _read_registers(self) -> dict[int, int]:
+        """Read all register blocks and return {register: raw_value}."""
+        client = self._ensure_client()
+        regs: dict[int, int] = {}
+        for start, count in READ_BLOCKS:
+            try:
+                values = client.read_input_registers(register_addr=start, quantity=count)
+            except Exception:
+                # Reconnect once and retry
+                self._client = self._connect()
+                client = self._client
+                values = client.read_input_registers(register_addr=start, quantity=count)
+            for i, val in enumerate(values):
+                regs[start + i] = val
+        return regs
+
+    @staticmethod
+    def _signed(value: int) -> int:
+        """Convert unsigned 16-bit to signed."""
+        return value - 65536 if value >= 32768 else value
+
+    @staticmethod
+    def _signed32(value: int) -> int:
+        """Convert unsigned 32-bit to signed."""
+        return value - 4294967296 if value >= 2147483648 else value
+
+    def _parse(self, regs: dict[int, int]) -> dict[str, Any]:
+        """Parse raw registers into sensor values."""
+        data: dict[str, Any] = {}
+
+        # --- 16-bit single-register sensors ---
+        for group in (
+            REGISTERS_PV,
+            REGISTERS_GRID,
+            REGISTERS_LOAD,
+            REGISTERS_INVERTER,
+            REGISTERS_TEMPERATURE,
+            REGISTERS_ENERGY_DAILY,
+            REGISTERS_STATUS,
+        ):
+            for reg, name, *_, scale, precision, signed in group:
+                if name is None:
+                    continue
+                raw = regs.get(reg)
+                if raw is None:
+                    continue
+                val = self._signed(raw) if signed else raw
+                data[name] = round(val * scale, precision)
+
+        # --- Battery (with offset temperature) ---
+        for reg, name, *_, scale, precision, signed in REGISTERS_BATTERY:
+            if name is None:
+                continue
+            raw = regs.get(reg)
+            if raw is None:
+                continue
+            if name == "Battery Temperature":
+                # Deye stores battery temp with +1000 offset (×0.1 °C)
+                data[name] = round((raw - 1000) * 0.1, 1)
+            else:
+                val = self._signed(raw) if signed else raw
+                data[name] = round(val * scale, precision)
+
+        # --- 32-bit total energy ---
+        for low, high, name, *_, scale, precision in REGISTERS_ENERGY_TOTAL:
+            low_val = regs.get(low)
+            high_val = regs.get(high)
+            if low_val is None or high_val is None:
+                continue
+            combined = (high_val << 16) | low_val
+            data[name] = round(combined * scale, precision)
+
+        # --- Translate running state to text ---
+        if "Running State" in data:
+            raw_state = int(data["Running State"])
+            data["Running State"] = RUNNING_STATES.get(raw_state, f"Unknown ({raw_state})")
+
+        # --- Grid connected as boolean-like text ---
+        if "Grid Connected Status" in data:
+            data["Grid Connected Status"] = (
+                "Connected" if int(data["Grid Connected Status"]) == 1 else "Disconnected"
+            )
+
+        # --- CO2 savings ---
+        co2 = self._co2_factor
+        daily_pv = data.get("Daily PV Energy")
+        if daily_pv is not None:
+            data["Daily CO2 Saved"] = round(daily_pv * co2, 2)
+        total_pv = data.get("Total PV Energy")
+        if total_pv is not None:
+            data["Total CO2 Saved"] = round(total_pv * co2, 1)
+
+        return data
+
+    # ------------------------------------------------------------------
+    # Coordinator interface
+    # ------------------------------------------------------------------
+
+    async def _async_update_data(self) -> dict[str, Any]:
+        """Fetch data from the inverter."""
+        try:
+            regs = await self.hass.async_add_executor_job(self._read_registers)
+        except Exception as err:
+            self._client = None
+            raise UpdateFailed(f"Error communicating with inverter: {err}") from err
+
+        return self._parse(regs)
+
+    async def async_shutdown(self) -> None:
+        """Disconnect the client when HA shuts down."""
+        await super().async_shutdown()
+        if self._client is not None:
+            try:
+                await self.hass.async_add_executor_job(self._client.disconnect)
+            except Exception:  # noqa: BLE001
+                pass
+            self._client = None

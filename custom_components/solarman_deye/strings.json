@@ -1,0 +1,33 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Solarman Deye Inverter",
+        "description": "Enter the connection details for your Solarman data logger.",
+        "data": {
+          "host": "IP Address",
+          "serial_number": "Serial Number",
+          "port": "Port",
+          "slave_id": "Modbus Slave ID"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to the data logger. Check the IP, serial number and port."
+    },
+    "abort": {
+      "already_configured": "This device is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Solarman Deye Options",
+        "data": {
+          "scan_interval": "Update interval (seconds)",
+          "co2_factor": "CO2 emission factor (kg CO2/kWh)"
+        }
+      }
+    }
+  }
+}

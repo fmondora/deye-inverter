@@ -241,6 +241,15 @@ class SolarmanDeyeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             regs = await self.hass.async_add_executor_job(self._read_registers)
         except Exception as err:
             self._client = None
+            # If we have never had a successful read, return empty data so
+            # that the first refresh succeeds and entities are created.
+            # They will show 'Unknown' until the inverter wakes up.
+            if self.data is None:
+                _LOGGER.warning(
+                    "Inverter not responding (probably standby) — "
+                    "sensors will update when it wakes up: %s", err,
+                )
+                return {}
             raise UpdateFailed(f"Error communicating with inverter: {err}") from err
 
         # Read device info once after the first successful poll.

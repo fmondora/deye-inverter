@@ -74,47 +74,50 @@ class SolarmanDeyeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # Connection helpers
     # ------------------------------------------------------------------
 
-    def _connect(self) -> PySolarmanV5:
-        """Create and return a PySolarmanV5 client (blocking)."""
+    def _new_client(self) -> PySolarmanV5:
+        """Create a fresh PySolarmanV5 client (blocking)."""
+        return PySolarmanV5(
+            self._host,
+            self._serial,
+            port=self._port,
+            mb_slave_id=self._slave_id,
+            auto_reconnect=False,
+            socket_timeout=10,
+        )
+
+    def _disconnect(self) -> None:
+        """Close the current client connection if any."""
         if self._client is not None:
             try:
                 self._client.disconnect()
             except Exception:  # noqa: BLE001
                 pass
-        client = PySolarmanV5(
-            self._host,
-            self._serial,
-            port=self._port,
-            mb_slave_id=self._slave_id,
-            auto_reconnect=True,
-            socket_timeout=10,
-        )
-        return client
-
-    def _ensure_client(self) -> PySolarmanV5:
-        if self._client is None:
-            self._client = self._connect()
-        return self._client
+            self._client = None
 
     # ------------------------------------------------------------------
     # Data reading (runs in executor)
     # ------------------------------------------------------------------
 
     def _read_registers(self) -> dict[int, int]:
-        """Read all register blocks and return {register: raw_value}."""
-        client = self._ensure_client()
-        regs: dict[int, int] = {}
-        for start, count in READ_BLOCKS:
-            try:
-                values = client.read_input_registers(register_addr=start, quantity=count)
-            except Exception:
-                # Reconnect once and retry
-                self._client = self._connect()
-                client = self._client
-                values = client.read_input_registers(register_addr=start, quantity=count)
-            for i, val in enumerate(values):
-                regs[start + i] = val
-        return regs
+        """Connect, read all register blocks, disconnect.
+
+        Opens a fresh connection each poll cycle so the data logger's
+        single TCP slot is free between reads.
+        """
+        self._disconnect()
+        client = self._new_client()
+        self._client = client
+        try:
+            regs: dict[int, int] = {}
+            for start, count in READ_BLOCKS:
+                values = client.read_input_registers(
+                    register_addr=start, quantity=count,
+                )
+                for i, val in enumerate(values):
+                    regs[start + i] = val
+            return regs
+        finally:
+            self._disconnect()
 
     @staticmethod
     def _signed(value: int) -> int:
@@ -215,8 +218,9 @@ class SolarmanDeyeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """
         if self._device_info_read:
             return
+        self._disconnect()
         try:
-            client = self._ensure_client()
+            client = self._new_client()
             start, count = DEVICE_INFO_BLOCK
             values = client.read_input_registers(register_addr=start, quantity=count)
             # Register 0: device type code
@@ -227,6 +231,7 @@ class SolarmanDeyeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if len(values) > 15:
                 major, minor, patch = values[13], values[14], values[15]
                 self.firmware_version = f"{major}.{minor}.{patch}"
+            client.disconnect()
         except Exception:  # noqa: BLE001
             _LOGGER.debug("Could not read device info registers — skipping")
         self._device_info_read = True
@@ -261,9 +266,4 @@ class SolarmanDeyeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_shutdown(self) -> None:
         """Disconnect the client when HA shuts down."""
         await super().async_shutdown()
-        if self._client is not None:
-            try:
-                await self.hass.async_add_executor_job(self._client.disconnect)
-            except Exception:  # noqa: BLE001
-                pass
-            self._client = None
+        await self.hass.async_add_executor_job(self._disconnect)

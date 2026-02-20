@@ -7,9 +7,11 @@ Custom integration for Home Assistant that reads **all available data** from Dey
 
 ## Features
 
+- **Auto-discovery**: finds Solarman data loggers on the network via UDP broadcast (port 48899)
 - **~40 sensors**: PV, battery, grid, load, inverter, temperatures, daily/total energy, status
 - **CO2 savings tracking**: daily and total CO2 avoided thanks to solar production (Italian grid default, configurable)
 - **Battery cycle tracking**: equivalent full charge cycles and estimated battery health percentage
+- **Diagnostics / About page**: download inverter configuration (work mode, battery settings, time-of-use slots) from the device page
 - **Energy Dashboard ready**: all energy sensors use `TOTAL_INCREASING` state class for seamless integration
 - **Config flow UI**: set up entirely from the Home Assistant interface
 - **Efficient polling**: reads Modbus registers in contiguous blocks (2 reads per cycle)
@@ -47,11 +49,19 @@ Copy the `custom_components/solarman_deye` folder into your Home Assistant `cust
 
 1. Go to **Settings > Devices & Services > Add Integration**
 2. Search for **Solarman Deye**
-3. Enter:
-   - **IP Address**: your data logger's LAN IP (e.g. `192.168.86.69`)
-   - **Serial Number**: the data logger serial number
-   - **Port**: `8899` (default)
-   - **Slave ID**: `1` (default)
+3. Choose **Auto-discover on network** or **Manual configuration**
+
+### Auto-discovery
+
+The integration sends a UDP broadcast on port 48899. All Solarman data loggers on the local network respond with their IP, MAC and serial number. Select the device you want to add.
+
+### Manual
+
+Enter:
+- **IP Address**: your data logger's LAN IP (e.g. `192.168.86.69`)
+- **Serial Number**: the data logger serial number
+- **Port**: `8899` (default)
+- **Slave ID**: `1` (default)
 
 ### Options
 
@@ -61,6 +71,16 @@ After setup, click **Configure** on the integration to change:
 - **CO2 emission factor** (default: 0.256 kg CO2/kWh - Italian grid average, ISPRA)
 - **Battery capacity** (default: 5.12 kWh) - used to compute equivalent full cycles
 - **Battery rated cycle life** (default: 6000 for LiFePO4) - used to estimate battery health %
+
+## Diagnostics / About
+
+To view the inverter configuration (work mode, battery type and limits, time-of-use schedules):
+
+1. Go to **Settings > Devices & Services > Solarman Deye**
+2. Click on the device
+3. Click **Download Diagnostics**
+
+The JSON file contains the full inverter configuration read from holding registers, plus the current sensor readings.
 
 ## Energy Dashboard
 

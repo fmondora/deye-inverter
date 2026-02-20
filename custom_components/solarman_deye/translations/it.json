@@ -3,6 +3,21 @@
     "step": {
       "user": {
         "title": "Inverter Solarman Deye",
+        "description": "Come vuoi configurare l'inverter?",
+        "menu_options": {
+          "discover": "Ricerca automatica in rete",
+          "manual": "Configurazione manuale"
+        }
+      },
+      "discover": {
+        "title": "Seleziona dispositivo",
+        "description": "I seguenti data logger Solarman sono stati trovati nella tua rete.",
+        "data": {
+          "device": "Dispositivo"
+        }
+      },
+      "manual": {
+        "title": "Configurazione manuale",
         "description": "Inserisci i dati di connessione del tuo data logger Solarman.",
         "data": {
           "host": "Indirizzo IP",
@@ -16,7 +31,8 @@
       "cannot_connect": "Impossibile connettersi al data logger. Controlla IP, numero di serie e porta."
     },
     "abort": {
-      "already_configured": "Questo dispositivo \u00e8 gi\u00e0 configurato."
+      "already_configured": "Questo dispositivo \u00e8 gi\u00e0 configurato.",
+      "no_devices_found": "Nessun data logger Solarman trovato nella rete. Prova la configurazione manuale."
     }
   },
   "options": {

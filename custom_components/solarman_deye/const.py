@@ -154,3 +154,91 @@ READ_BLOCKS = [
     (59, 55),   # 59-113: status, energy daily/total, grid freq, temps, PV
     (150, 45),  # 150-194: grid, inverter, load, battery, PV power, status
 ]
+
+# ---------------------------------------------------------------------------
+# Holding registers — inverter configuration (read on demand for diagnostics)
+# Addresses based on Deye SUN-xK-SG04LP1 single-phase hybrid.
+# ---------------------------------------------------------------------------
+
+HOLDING_READ_BLOCKS = [
+    (100, 15),   # 100-114: work mode, battery settings
+    (148, 42),   # 148-189: time-of-use slots (6 × 7 registers)
+]
+
+HOLDING_REGISTER_LABELS: dict[int, str] = {
+    # System / work mode
+    100: "Work mode",
+    101: "Grid charge enable",
+    # Battery configuration
+    102: "Battery type",
+    103: "Battery capacity",
+    104: "Battery empty voltage",
+    105: "Battery full voltage",
+    106: "Battery empty SOC",
+    107: "Battery shutdown SOC",
+    108: "Max charge current",
+    109: "Max discharge current",
+    110: "Grid charge current limit",
+    111: "Battery low voltage warning",
+    112: "Battery low SOC warning",
+    # Time-of-use slot 1
+    148: "Slot 1 start hour",
+    149: "Slot 1 start minute",
+    150: "Slot 1 end hour",
+    151: "Slot 1 end minute",
+    152: "Slot 1 enable",
+    153: "Slot 1 charge/discharge",
+    154: "Slot 1 SOC target",
+    # Time-of-use slot 2
+    155: "Slot 2 start hour",
+    156: "Slot 2 start minute",
+    157: "Slot 2 end hour",
+    158: "Slot 2 end minute",
+    159: "Slot 2 enable",
+    160: "Slot 2 charge/discharge",
+    161: "Slot 2 SOC target",
+    # Time-of-use slot 3
+    162: "Slot 3 start hour",
+    163: "Slot 3 start minute",
+    164: "Slot 3 end hour",
+    165: "Slot 3 end minute",
+    166: "Slot 3 enable",
+    167: "Slot 3 charge/discharge",
+    168: "Slot 3 SOC target",
+    # Time-of-use slot 4
+    169: "Slot 4 start hour",
+    170: "Slot 4 start minute",
+    171: "Slot 4 end hour",
+    172: "Slot 4 end minute",
+    173: "Slot 4 enable",
+    174: "Slot 4 charge/discharge",
+    175: "Slot 4 SOC target",
+    # Time-of-use slot 5
+    176: "Slot 5 start hour",
+    177: "Slot 5 start minute",
+    178: "Slot 5 end hour",
+    179: "Slot 5 end minute",
+    180: "Slot 5 enable",
+    181: "Slot 5 charge/discharge",
+    182: "Slot 5 SOC target",
+    # Time-of-use slot 6
+    183: "Slot 6 start hour",
+    184: "Slot 6 start minute",
+    185: "Slot 6 end hour",
+    186: "Slot 6 end minute",
+    187: "Slot 6 enable",
+    188: "Slot 6 charge/discharge",
+    189: "Slot 6 SOC target",
+}
+
+WORK_MODES: dict[int, str] = {
+    0: "Selling first",
+    1: "Zero-export to load",
+    2: "Zero-export to CT",
+}
+
+BATTERY_TYPES: dict[int, str] = {
+    0: "Lead-acid",
+    1: "LiFePO4",
+    2: "User-defined",
+}

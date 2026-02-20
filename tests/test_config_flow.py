@@ -19,18 +19,32 @@ from custom_components.solarman_deye.const import (
     DEFAULT_SLAVE_ID,
     DOMAIN,
 )
+from custom_components.solarman_deye.discovery import DiscoveredDevice
 
 from .conftest import MOCK_CONFIG, MOCK_HOST, MOCK_SERIAL
 
 
-async def test_successful_config_flow(hass: HomeAssistant, mock_solarman_config_flow):
-    """Test a successful config flow from start to finish."""
+# ------------------------------------------------------------------
+# Manual flow
+# ------------------------------------------------------------------
+
+
+async def test_manual_flow_success(hass: HomeAssistant, mock_solarman_config_flow):
+    """Test a successful manual config flow."""
+    # Step 1 — menu
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
-    assert result["type"] is FlowResultType.FORM
-    assert result["step_id"] == "user"
+    assert result["type"] is FlowResultType.MENU
 
+    # Step 2 — pick manual
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "manual"}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "manual"
+
+    # Step 3 — enter data
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], user_input=MOCK_CONFIG
     )
@@ -39,14 +53,17 @@ async def test_successful_config_flow(hass: HomeAssistant, mock_solarman_config_
     assert result["data"] == MOCK_CONFIG
 
 
-async def test_connection_failure(hass: HomeAssistant):
-    """Test that a connection failure shows an error."""
+async def test_manual_flow_connection_failure(hass: HomeAssistant):
+    """Test that a connection failure shows an error in manual mode."""
     with patch(
         "custom_components.solarman_deye.config_flow.PySolarmanV5",
         side_effect=Exception("timeout"),
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "manual"}
         )
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], user_input=MOCK_CONFIG
@@ -57,20 +74,72 @@ async def test_connection_failure(hass: HomeAssistant):
 
 async def test_duplicate_serial_aborts(hass: HomeAssistant, mock_solarman_config_flow):
     """Test that adding the same serial number twice aborts."""
-    # First entry
+    # First entry — manual
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "manual"}
     )
     await hass.config_entries.flow.async_configure(
         result["flow_id"], user_input=MOCK_CONFIG
     )
 
-    # Second entry with same serial
+    # Second entry — same serial
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "manual"}
     )
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], user_input=MOCK_CONFIG
     )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
+
+
+# ------------------------------------------------------------------
+# Discovery flow
+# ------------------------------------------------------------------
+
+
+async def test_discover_flow_success(hass: HomeAssistant, mock_solarman_config_flow):
+    """Test a successful discovery flow."""
+    mock_device = DiscoveredDevice(ip=MOCK_HOST, mac="AA:BB:CC:DD:EE:FF", serial=MOCK_SERIAL)
+
+    with patch(
+        "custom_components.solarman_deye.config_flow.scan_network",
+        return_value=[mock_device],
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "discover"}
+        )
+        assert result["type"] is FlowResultType.FORM
+        assert result["step_id"] == "discover"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={"device": "0"}
+        )
+        assert result["type"] is FlowResultType.CREATE_ENTRY
+        assert result["data"][CONF_SERIAL] == MOCK_SERIAL
+        assert result["data"][CONF_HOST] == MOCK_HOST
+
+
+async def test_discover_flow_no_devices(hass: HomeAssistant):
+    """Test that discovery with no results aborts gracefully."""
+    with patch(
+        "custom_components.solarman_deye.config_flow.scan_network",
+        return_value=[],
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"next_step_id": "discover"}
+        )
+        assert result["type"] is FlowResultType.ABORT
+        assert result["reason"] == "no_devices_found"

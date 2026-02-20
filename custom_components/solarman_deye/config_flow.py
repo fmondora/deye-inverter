@@ -1,4 +1,10 @@
-"""Config flow for Solarman Deye integration."""
+"""Config flow for Solarman Deye integration.
+
+Supports two setup paths:
+  - **Auto-discover**: scans the local network via UDP broadcast on port 48899
+    and lets the user pick a detected data logger.
+  - **Manual**: the user enters IP, serial number, port and slave ID by hand.
+"""
 
 from __future__ import annotations
 
@@ -28,10 +34,11 @@ from .const import (
     DEFAULT_SLAVE_ID,
     DOMAIN,
 )
+from .discovery import DiscoveredDevice, scan_network
 
 _LOGGER = logging.getLogger(__name__)
 
-STEP_USER_DATA_SCHEMA = vol.Schema(
+MANUAL_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_HOST): str,
         vol.Required(CONF_SERIAL): int,
@@ -57,18 +64,90 @@ class SolarmanDeyeConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    def __init__(self) -> None:
+        """Initialise flow state."""
+        self._discovered_devices: list[DiscoveredDevice] = []
+
+    # ------------------------------------------------------------------
+    # Entry point — choose discover or manual
+    # ------------------------------------------------------------------
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle the initial step."""
+        """Let the user choose between auto-discovery and manual entry."""
+        return self.async_show_menu(
+            step_id="user",
+            menu_options=["discover", "manual"],
+        )
+
+    # ------------------------------------------------------------------
+    # Auto-discovery via UDP broadcast
+    # ------------------------------------------------------------------
+
+    async def async_step_discover(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Scan the network and let the user pick a device."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            # Prevent duplicate entries for the same serial number
+            idx = int(user_input["device"])
+            device = self._discovered_devices[idx]
+
+            await self.async_set_unique_id(str(device.serial))
+            self._abort_if_unique_id_configured()
+
+            ok = await self.hass.async_add_executor_job(
+                _test_connection, device.ip, device.serial, DEFAULT_PORT, DEFAULT_SLAVE_ID,
+            )
+            if ok:
+                return self.async_create_entry(
+                    title=f"Solarman Deye ({device.ip})",
+                    data={
+                        CONF_HOST: device.ip,
+                        CONF_SERIAL: device.serial,
+                        CONF_PORT: DEFAULT_PORT,
+                        CONF_SLAVE_ID: DEFAULT_SLAVE_ID,
+                    },
+                )
+            errors["base"] = "cannot_connect"
+        else:
+            # First visit — run the scan
+            self._discovered_devices = await self.hass.async_add_executor_job(
+                scan_network
+            )
+
+        if not self._discovered_devices:
+            return self.async_abort(reason="no_devices_found")
+
+        device_map = {
+            str(i): f"{d.ip}  —  SN {d.serial}  ({d.mac})"
+            for i, d in enumerate(self._discovered_devices)
+        }
+
+        return self.async_show_form(
+            step_id="discover",
+            data_schema=vol.Schema(
+                {vol.Required("device"): vol.In(device_map)}
+            ),
+            errors=errors,
+        )
+
+    # ------------------------------------------------------------------
+    # Manual entry
+    # ------------------------------------------------------------------
+
+    async def async_step_manual(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle manual configuration entry."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
             await self.async_set_unique_id(str(user_input[CONF_SERIAL]))
             self._abort_if_unique_id_configured()
 
-            # Validate connection in executor
             ok = await self.hass.async_add_executor_job(
                 _test_connection,
                 user_input[CONF_HOST],
@@ -84,10 +163,14 @@ class SolarmanDeyeConfigFlow(ConfigFlow, domain=DOMAIN):
             errors["base"] = "cannot_connect"
 
         return self.async_show_form(
-            step_id="user",
-            data_schema=STEP_USER_DATA_SCHEMA,
+            step_id="manual",
+            data_schema=MANUAL_DATA_SCHEMA,
             errors=errors,
         )
+
+    # ------------------------------------------------------------------
+    # Options flow
+    # ------------------------------------------------------------------
 
     @staticmethod
     @callback

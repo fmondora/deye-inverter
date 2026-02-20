@@ -24,6 +24,10 @@ DEFAULT_PORT = 8899
 DEFAULT_SLAVE_ID = 1
 DEFAULT_SCAN_INTERVAL = 30
 
+# Passive TCP server — the data logger pushes data to this port.
+CONF_SERVER_PORT = "server_port"
+DEFAULT_SERVER_PORT = 10000
+
 # CO2 emission factor for the Italian electricity grid (kg CO2 per kWh).
 # Source: ISPRA — average Italian grid intensity ~256 g CO2/kWh.
 DEFAULT_CO2_FACTOR = 0.256

@@ -70,6 +70,13 @@ class SolarmanDeyeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.device_type: str = "Hybrid Inverter"
         self.firmware_version: str | None = None
         self._device_info_read = False
+        # Registers received via the passive V5 server (push mode).
+        self._pushed_registers: dict[int, int] | None = None
+
+    def receive_pushed_data(self, regs: dict[int, int]) -> None:
+        """Called by the V5 server when new register data is pushed."""
+        self._pushed_registers = regs
+        _LOGGER.debug("Stored %d pushed registers for next update", len(regs))
 
     # ------------------------------------------------------------------
     # Connection helpers
@@ -254,7 +261,19 @@ class SolarmanDeyeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # ------------------------------------------------------------------
 
     async def _async_update_data(self) -> dict[str, Any]:
-        """Fetch data from the inverter."""
+        """Fetch data from the inverter.
+
+        Prefers data received via the passive V5 server (push mode).
+        Falls back to direct polling if no pushed data is available.
+        """
+        # Use pushed data if the V5 server has received any.
+        if self._pushed_registers is not None:
+            regs = self._pushed_registers
+            self._pushed_registers = None
+            _LOGGER.debug("Using %d registers from push server", len(regs))
+            return self._parse(regs)
+
+        # Fall back to direct polling.
         try:
             regs = await self.hass.async_add_executor_job(self._read_registers)
         except Exception as err:
@@ -264,8 +283,8 @@ class SolarmanDeyeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # They will show 'Unknown' until the inverter wakes up.
             if self.data is None:
                 _LOGGER.warning(
-                    "Inverter not responding (probably standby) — "
-                    "sensors will update when it wakes up: %s", err,
+                    "Inverter not responding (probably standby / cloud busy) — "
+                    "sensors will update when data arrives: %s", err,
                 )
                 return {}
             raise UpdateFailed(f"Error communicating with inverter: {err}") from err

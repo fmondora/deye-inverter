@@ -42,7 +42,8 @@
           "scan_interval": "Update interval (seconds)",
           "co2_factor": "CO2 emission factor (kg CO2/kWh)",
           "battery_capacity": "Battery capacity (kWh)",
-          "battery_rated_cycles": "Battery rated cycle life"
+          "battery_rated_cycles": "Battery rated cycle life",
+          "server_port": "Passive server port (for data logger push)"
         }
       }
     }

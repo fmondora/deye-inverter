@@ -38,7 +38,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the firmware update entity."""
-    coordinator: SolarmanDeyeCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator: SolarmanDeyeCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     serial = entry.data[CONF_SERIAL]
     async_add_entities([SolarmanDeyeUpdateEntity(hass, coordinator, serial)])
 

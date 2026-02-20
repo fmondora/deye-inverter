@@ -25,12 +25,14 @@ from .const import (
     CONF_CO2_FACTOR,
     CONF_PORT,
     CONF_SERIAL,
+    CONF_SERVER_PORT,
     CONF_SLAVE_ID,
     DEFAULT_BATTERY_CAPACITY,
     DEFAULT_BATTERY_RATED_CYCLES,
     DEFAULT_CO2_FACTOR,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_SERVER_PORT,
     DEFAULT_SLAVE_ID,
     DOMAIN,
 )
@@ -284,6 +286,12 @@ class SolarmanDeyeOptionsFlow(OptionsFlow):
                             CONF_BATTERY_RATED_CYCLES, DEFAULT_BATTERY_RATED_CYCLES
                         ),
                     ): vol.All(vol.Coerce(int), vol.Range(min=100, max=20000)),
+                    vol.Optional(
+                        CONF_SERVER_PORT,
+                        default=self._config_entry.options.get(
+                            CONF_SERVER_PORT, DEFAULT_SERVER_PORT
+                        ),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=1024, max=65535)),
                 }
             ),
         )

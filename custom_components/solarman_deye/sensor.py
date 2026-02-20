@@ -33,7 +33,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Solarman Deye sensors from a config entry."""
-    coordinator: SolarmanDeyeCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator: SolarmanDeyeCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
     serial = entry.data[CONF_SERIAL]
 
     entities: list[SolarmanDeyeSensor] = []

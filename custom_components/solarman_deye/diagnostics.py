@@ -112,7 +112,7 @@ async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
-    coordinator: SolarmanDeyeCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator: SolarmanDeyeCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
 
     # Latest sensor readings
     sensor_data = dict(coordinator.data) if coordinator.data else {}

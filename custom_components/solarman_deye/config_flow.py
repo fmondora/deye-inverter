@@ -83,6 +83,16 @@ def _test_connection(host: str, serial: int, port: int, slave_id: int) -> bool:
         _LOGGER.debug("Connection test OK — register 59 = %s", result)
         return True
     except Exception as err:  # noqa: BLE001
+        err_msg = str(err)
+        # AcknowledgeError means the data logger responded — the inverter
+        # is reachable but busy or in standby (common at night).  Treat
+        # any V5 Modbus exception *other* than a serial-number mismatch
+        # as a successful connectivity proof.
+        if "AcknowledgeError" in err_msg or "SlaveDeviceBusy" in err_msg:
+            _LOGGER.debug(
+                "Connection test OK (inverter in standby): %s", err_msg,
+            )
+            return True
         _LOGGER.error(
             "Solarman V5 protocol failed for %s:%s (serial=%s): %s: %s. "
             "The serial number must match the data logger (NOT the inverter). "

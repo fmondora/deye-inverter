@@ -50,13 +50,28 @@ MANUAL_DATA_SCHEMA = vol.Schema(
 
 def _test_connection(host: str, serial: int, port: int, slave_id: int) -> bool:
     """Try to read register 59 (running state) to validate the connection."""
+    client = None
     try:
-        client = PySolarmanV5(host, serial, port=port, mb_slave_id=slave_id, socket_timeout=10)
-        client.read_input_registers(register_addr=59, quantity=1)
-        client.disconnect()
-    except Exception:  # noqa: BLE001
+        _LOGGER.debug(
+            "Testing connection to %s:%s (serial=%s, slave=%s)",
+            host, port, serial, slave_id,
+        )
+        client = PySolarmanV5(
+            host, serial, port=port, mb_slave_id=slave_id,
+            auto_reconnect=False, socket_timeout=15,
+        )
+        result = client.read_input_registers(register_addr=59, quantity=1)
+        _LOGGER.debug("Connection test OK — register 59 = %s", result)
+        return True
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.warning("Connection test failed: %s: %s", type(err).__name__, err)
         return False
-    return True
+    finally:
+        if client is not None:
+            try:
+                client.disconnect()
+            except Exception:  # noqa: BLE001
+                pass
 
 
 class SolarmanDeyeConfigFlow(ConfigFlow, domain=DOMAIN):

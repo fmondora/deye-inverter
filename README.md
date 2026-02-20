@@ -11,6 +11,7 @@ Custom integration for Home Assistant that reads **all available data** from Dey
 - **~40 sensors**: PV, battery, grid, load, inverter, temperatures, daily/total energy, status
 - **CO2 savings tracking**: daily and total CO2 avoided thanks to solar production (Italian grid default, configurable)
 - **Battery cycle tracking**: equivalent full charge cycles and estimated battery health percentage
+- **Firmware update check**: reads the installed firmware version and compares it with a community-maintained manifest — notifies when a new version is available
 - **Diagnostics / About page**: download inverter configuration (work mode, battery settings, time-of-use slots) from the device page
 - **Energy Dashboard ready**: all energy sensors use `TOTAL_INCREASING` state class for seamless integration
 - **Config flow UI**: set up entirely from the Home Assistant interface
@@ -81,6 +82,22 @@ To view the inverter configuration (work mode, battery type and limits, time-of-
 3. Click **Download Diagnostics**
 
 The JSON file contains the full inverter configuration read from holding registers, plus the current sensor readings.
+
+## Firmware Update Check
+
+The integration reads the inverter firmware version at startup and periodically checks a [manifest file](firmware.json) hosted in this repository. When a newer version is listed, a notification appears on the device page in Home Assistant.
+
+The integration **cannot install firmware remotely**. To update, use the Solarman app or contact your installer.
+
+To update the manifest when a new firmware is released, edit `firmware.json` in this repository:
+
+```json
+{
+  "latest_version": "1.47.0",
+  "release_notes": "Description of changes...",
+  "release_url": "https://link-to-more-info"
+}
+```
 
 ## Energy Dashboard
 

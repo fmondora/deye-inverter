@@ -130,7 +130,8 @@ class SolarmanDeyeSensor(CoordinatorEntity[SolarmanDeyeCoordinator], SensorEntit
             identifiers={(DOMAIN, str(serial))},
             name=f"Solarman Deye {serial}",
             manufacturer="Deye",
-            model="Hybrid Inverter",
+            model=coordinator.device_type,
+            sw_version=coordinator.firmware_version,
         )
 
     @callback

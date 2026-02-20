@@ -242,3 +242,27 @@ BATTERY_TYPES: dict[int, str] = {
     1: "LiFePO4",
     2: "User-defined",
 }
+
+# ---------------------------------------------------------------------------
+# Firmware update check
+# ---------------------------------------------------------------------------
+
+# Device info registers — read once at startup for firmware version.
+# Input registers 0-15 contain device identification on Deye hybrids.
+DEVICE_INFO_BLOCK = (0, 16)
+
+# Deye device type codes
+DEVICE_TYPES: dict[int, str] = {
+    2: "String Inverter",
+    3: "Single-Phase Hybrid",
+    4: "Micro Inverter",
+    5: "Three-Phase Hybrid",
+}
+
+# URL of the firmware manifest hosted in the GitHub repository.
+FIRMWARE_MANIFEST_URL = (
+    "https://raw.githubusercontent.com/fmondora/deye-inverter/main/firmware.json"
+)
+
+# How often to check for firmware updates (seconds).
+FIRMWARE_CHECK_INTERVAL = 86400  # 24 hours

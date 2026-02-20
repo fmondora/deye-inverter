@@ -16,6 +16,8 @@ from .const import (
     DEFAULT_BATTERY_RATED_CYCLES,
     DEFAULT_CO2_FACTOR,
     DEFAULT_SCAN_INTERVAL,
+    DEVICE_INFO_BLOCK,
+    DEVICE_TYPES,
     DOMAIN,
     READ_BLOCKS,
     REGISTERS_BATTERY,
@@ -63,6 +65,10 @@ class SolarmanDeyeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._battery_capacity = battery_capacity
         self._battery_rated_cycles = battery_rated_cycles
         self._client: PySolarmanV5 | None = None
+        # Device info — populated once at first successful read.
+        self.device_type: str = "Hybrid Inverter"
+        self.firmware_version: str | None = None
+        self._device_info_read = False
 
     # ------------------------------------------------------------------
     # Connection helpers
@@ -198,6 +204,34 @@ class SolarmanDeyeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return data
 
     # ------------------------------------------------------------------
+    # Device info (read once)
+    # ------------------------------------------------------------------
+
+    def _read_device_info(self) -> None:
+        """Read input registers 0-15 for device identification (blocking).
+
+        Called once after the first successful connection.  Failures are
+        silently ignored — the data is nice-to-have, not critical.
+        """
+        if self._device_info_read:
+            return
+        try:
+            client = self._ensure_client()
+            start, count = DEVICE_INFO_BLOCK
+            values = client.read_input_registers(register_addr=start, quantity=count)
+            # Register 0: device type code
+            dev_code = values[0]
+            self.device_type = DEVICE_TYPES.get(dev_code, f"Type {dev_code}")
+            # Firmware version: registers 13-15 often hold major.minor.patch
+            # encoded as plain integers (e.g. 1, 47, 0 → "1.47.0").
+            if len(values) > 15:
+                major, minor, patch = values[13], values[14], values[15]
+                self.firmware_version = f"{major}.{minor}.{patch}"
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Could not read device info registers — skipping")
+        self._device_info_read = True
+
+    # ------------------------------------------------------------------
     # Coordinator interface
     # ------------------------------------------------------------------
 
@@ -208,6 +242,10 @@ class SolarmanDeyeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except Exception as err:
             self._client = None
             raise UpdateFailed(f"Error communicating with inverter: {err}") from err
+
+        # Read device info once after the first successful poll.
+        if not self._device_info_read:
+            await self.hass.async_add_executor_job(self._read_device_info)
 
         return self._parse(regs)
 

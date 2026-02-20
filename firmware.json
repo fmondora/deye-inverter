@@ -1,0 +1,5 @@
+{
+  "latest_version": "1.47.0",
+  "release_notes": "Latest known firmware for Deye single-phase hybrid inverters (SUN-xK-SG04LP1). Check the Solarman app or contact your installer for the update file.",
+  "release_url": "https://github.com/fmondora/deye-inverter/blob/main/firmware.json"
+}

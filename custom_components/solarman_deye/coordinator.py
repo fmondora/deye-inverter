@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import timedelta
 from typing import Any
 
@@ -102,22 +103,34 @@ class SolarmanDeyeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Connect, read all register blocks, disconnect.
 
         Opens a fresh connection each poll cycle so the data logger's
-        single TCP slot is free between reads.
+        single TCP slot is free between reads.  Retries up to 3 times
+        with a short pause to work around data-logger cloud contention.
         """
-        self._disconnect()
-        client = self._new_client()
-        self._client = client
-        try:
-            regs: dict[int, int] = {}
-            for start, count in READ_BLOCKS:
-                values = client.read_input_registers(
-                    register_addr=start, quantity=count,
-                )
-                for i, val in enumerate(values):
-                    regs[start + i] = val
-            return regs
-        finally:
+        last_err: Exception | None = None
+        for attempt in range(1, 4):
             self._disconnect()
+            try:
+                client = self._new_client()
+                self._client = client
+                regs: dict[int, int] = {}
+                for start, count in READ_BLOCKS:
+                    values = client.read_input_registers(
+                        register_addr=start, quantity=count,
+                    )
+                    for i, val in enumerate(values):
+                        regs[start + i] = val
+                return regs
+            except Exception as err:  # noqa: BLE001
+                last_err = err
+                _LOGGER.debug(
+                    "Read attempt %s/3 failed: %s — retrying in 2s",
+                    attempt, err,
+                )
+                self._disconnect()
+                if attempt < 3:
+                    time.sleep(2)
+
+        raise last_err  # type: ignore[misc]
 
     @staticmethod
     def _signed(value: int) -> int:

@@ -12,6 +12,7 @@ from .const import (
     CONF_BATTERY_CAPACITY,
     CONF_BATTERY_RATED_CYCLES,
     CONF_CO2_FACTOR,
+    CONF_MODE,
     CONF_PORT,
     CONF_SERIAL,
     CONF_SERVER_PORT,
@@ -19,9 +20,12 @@ from .const import (
     DEFAULT_BATTERY_CAPACITY,
     DEFAULT_BATTERY_RATED_CYCLES,
     DEFAULT_CO2_FACTOR,
+    DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_SERVER_PORT,
+    DEFAULT_SLAVE_ID,
     DOMAIN,
+    MODE_PUSH,
 )
 from .coordinator import SolarmanDeyeCoordinator
 from .server import SolarmanV5Server
@@ -34,36 +38,49 @@ PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.UPDATE]
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Solarman Deye from a config entry."""
     serial = entry.data[CONF_SERIAL]
-    server_port = entry.options.get(CONF_SERVER_PORT, DEFAULT_SERVER_PORT)
+    mode = entry.data.get(CONF_MODE, "poll")
+    is_push = mode == MODE_PUSH
+
+    # Server port: options override > data > default
+    server_port = entry.options.get(
+        CONF_SERVER_PORT,
+        entry.data.get(CONF_SERVER_PORT, DEFAULT_SERVER_PORT),
+    )
 
     coordinator = SolarmanDeyeCoordinator(
         hass,
-        host=entry.data[CONF_HOST],
+        host=entry.data.get(CONF_HOST, ""),
         serial=serial,
-        port=entry.data[CONF_PORT],
-        slave_id=entry.data[CONF_SLAVE_ID],
+        port=entry.data.get(CONF_PORT, DEFAULT_PORT),
+        slave_id=entry.data.get(CONF_SLAVE_ID, DEFAULT_SLAVE_ID),
         scan_interval=entry.options.get("scan_interval", DEFAULT_SCAN_INTERVAL),
         co2_factor=entry.options.get(CONF_CO2_FACTOR, DEFAULT_CO2_FACTOR),
         battery_capacity=entry.options.get(CONF_BATTERY_CAPACITY, DEFAULT_BATTERY_CAPACITY),
         battery_rated_cycles=entry.options.get(CONF_BATTERY_RATED_CYCLES, DEFAULT_BATTERY_RATED_CYCLES),
     )
 
-    # Start the passive V5 server so the data logger can push data to us.
-    v5_server = SolarmanV5Server(
-        port=server_port,
-        serial=serial,
-        on_data=coordinator.receive_pushed_data,
-    )
-    try:
-        await v5_server.start()
-        coordinator.enable_push_mode()
-    except OSError as err:
-        _LOGGER.warning(
-            "Could not start V5 passive server on port %s: %s — "
-            "push mode disabled, will use direct polling only",
-            server_port, err,
+    v5_server: SolarmanV5Server | None = None
+
+    if is_push:
+        # Push mode: start the passive V5 server, disable polling.
+        v5_server = SolarmanV5Server(
+            port=server_port,
+            serial=serial,
+            on_data=coordinator.receive_pushed_data,
         )
-        v5_server = None
+        try:
+            await v5_server.start()
+            coordinator.enable_push_mode()
+            _LOGGER.info(
+                "Push mode active — listening on port %s for serial %s",
+                server_port, serial,
+            )
+        except OSError as err:
+            _LOGGER.error(
+                "Could not start V5 passive server on port %s: %s",
+                server_port, err,
+            )
+            v5_server = None
 
     await coordinator.async_config_entry_first_refresh()
 

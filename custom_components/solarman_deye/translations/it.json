@@ -3,24 +3,25 @@
     "step": {
       "user": {
         "title": "Inverter Solarman Deye",
-        "description": "Come vuoi configurare l'inverter?",
+        "description": "Come vuoi ricevere i dati dall'inverter?",
         "data": {
-          "setup_method": "Metodo di configurazione"
+          "setup_method": "Modalità di connessione"
         }
       },
-      "discover": {
-        "title": "Seleziona dispositivo",
-        "description": "I seguenti data logger Solarman sono stati trovati nella tua rete.",
+      "push": {
+        "title": "Configurazione modalità Push",
+        "description": "Il data logger invierà i dati a Home Assistant. Configura il Server B nella pagina admin del logger (http://ip-logger) con l'IP di HA e la porta qui sotto.",
         "data": {
-          "device": "Dispositivo"
+          "serial_number": "Numero di serie del Data Logger",
+          "server_port": "Porta di ascolto"
         }
       },
-      "manual": {
-        "title": "Configurazione manuale",
-        "description": "Inserisci i dati di connessione del tuo data logger Solarman.",
+      "poll": {
+        "title": "Configurazione Polling Diretto",
+        "description": "Home Assistant interrogherà direttamente il data logger. Potrebbe non funzionare se la connessione cloud è attiva.",
         "data": {
-          "host": "Indirizzo IP",
-          "serial_number": "Numero di serie",
+          "host": "Indirizzo IP del Data Logger",
+          "serial_number": "Numero di serie del Data Logger",
           "port": "Porta",
           "slave_id": "Slave ID Modbus"
         }
@@ -30,8 +31,8 @@
       "cannot_connect": "Impossibile connettersi al data logger. Controlla IP, numero di serie e porta."
     },
     "abort": {
-      "already_configured": "Questo dispositivo \u00e8 gi\u00e0 configurato.",
-      "no_devices_found": "Nessun data logger Solarman trovato nella rete. Prova la configurazione manuale."
+      "already_configured": "Questo dispositivo è già configurato.",
+      "no_devices_found": "Nessun data logger Solarman trovato nella rete."
     }
   },
   "options": {
@@ -41,9 +42,9 @@
         "data": {
           "scan_interval": "Intervallo di aggiornamento (secondi)",
           "co2_factor": "Fattore emissione CO2 (kg CO2/kWh)",
-          "battery_capacity": "Capacit\u00e0 batteria (kWh)",
+          "battery_capacity": "Capacità batteria (kWh)",
           "battery_rated_cycles": "Cicli di vita nominali batteria",
-          "server_port": "Porta server passivo (per push dal data logger)"
+          "server_port": "Porta server passivo"
         }
       }
     }

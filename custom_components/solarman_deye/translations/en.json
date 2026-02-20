@@ -3,24 +3,25 @@
     "step": {
       "user": {
         "title": "Solarman Deye Inverter",
-        "description": "How do you want to set up the inverter?",
+        "description": "How do you want to receive data from the inverter?",
         "data": {
-          "setup_method": "Setup method"
+          "setup_method": "Connection mode"
         }
       },
-      "discover": {
-        "title": "Select Device",
-        "description": "The following Solarman data loggers were found on your network.",
+      "push": {
+        "title": "Push Mode Configuration",
+        "description": "The data logger will send data to Home Assistant. Configure Server B on the logger's admin page (http://logger-ip) with HA's IP and the port below.",
         "data": {
-          "device": "Device"
+          "serial_number": "Data Logger Serial Number",
+          "server_port": "Listening port"
         }
       },
-      "manual": {
-        "title": "Manual Configuration",
-        "description": "Enter the connection details for your Solarman data logger.",
+      "poll": {
+        "title": "Direct Polling Configuration",
+        "description": "Home Assistant will query the data logger directly. This may not work if the cloud connection is active.",
         "data": {
-          "host": "IP Address",
-          "serial_number": "Serial Number",
+          "host": "Data Logger IP Address",
+          "serial_number": "Data Logger Serial Number",
           "port": "Port",
           "slave_id": "Modbus Slave ID"
         }
@@ -31,7 +32,7 @@
     },
     "abort": {
       "already_configured": "This device is already configured.",
-      "no_devices_found": "No Solarman data loggers found on the network. Try manual configuration."
+      "no_devices_found": "No Solarman data loggers found on the network."
     }
   },
   "options": {
@@ -43,7 +44,7 @@
           "co2_factor": "CO2 emission factor (kg CO2/kWh)",
           "battery_capacity": "Battery capacity (kWh)",
           "battery_rated_cycles": "Battery rated cycle life",
-          "server_port": "Passive server port (for data logger push)"
+          "server_port": "Passive server port"
         }
       }
     }

@@ -24,6 +24,10 @@ DEFAULT_PORT = 8899
 DEFAULT_SLAVE_ID = 1
 DEFAULT_SCAN_INTERVAL = 30
 
+# Connection mode: "push" (passive server) or "poll" (active query).
+CONF_MODE = "mode"
+MODE_PUSH = "push"
+
 # Passive TCP server — the data logger pushes data to this port.
 CONF_SERVER_PORT = "server_port"
 DEFAULT_SERVER_PORT = 10000

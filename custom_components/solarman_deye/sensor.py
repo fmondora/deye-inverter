@@ -25,6 +25,7 @@ from .const import (
     REGISTERS_TEMPERATURE,
 )
 from .coordinator import SolarmanDeyeCoordinator
+from .server import SolarmanV5Server
 
 
 async def async_setup_entry(
@@ -33,10 +34,12 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Solarman Deye sensors from a config entry."""
-    coordinator: SolarmanDeyeCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    entry_data = hass.data[DOMAIN][entry.entry_id]
+    coordinator: SolarmanDeyeCoordinator = entry_data["coordinator"]
+    server: SolarmanV5Server | None = entry_data.get("server")
     serial = entry.data[CONF_SERIAL]
 
-    entities: list[SolarmanDeyeSensor] = []
+    entities: list[SensorEntity] = []
 
     # --- 16-bit register sensors ---
     for group in (
@@ -96,7 +99,60 @@ async def async_setup_entry(
             )
         )
 
+    # --- Server diagnostic sensors ---
+    if server is not None:
+        entities.append(
+            ServerStatusSensor(server, serial, "Server Status", "mdi:server-network")
+        )
+        entities.append(
+            ServerStatusSensor(server, serial, "Frames Received", "mdi:counter")
+        )
+        entities.append(
+            ServerStatusSensor(server, serial, "Last Data Received", "mdi:clock-outline")
+        )
+
     async_add_entities(entities)
+
+
+class ServerStatusSensor(SensorEntity):
+    """Diagnostic sensor showing V5 server status."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        server: SolarmanV5Server,
+        serial: int,
+        name: str,
+        icon: str,
+    ) -> None:
+        """Initialise the server status sensor."""
+        self._server = server
+        self._sensor_name = name
+        self._attr_unique_id = f"solarman_deye_{serial}_{name.lower().replace(' ', '_')}"
+        self._attr_name = name
+        self._attr_icon = icon
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, str(serial))},
+            name=f"Solarman Deye {serial}",
+            manufacturer="Deye",
+        )
+
+    @property
+    def native_value(self) -> str | int | None:
+        """Return the current value."""
+        if self._sensor_name == "Server Status":
+            return self._server.status
+        if self._sensor_name == "Frames Received":
+            return self._server.frames_received
+        if self._sensor_name == "Last Data Received":
+            return self._server.last_frame_time
+        return None
+
+    @property
+    def available(self) -> bool:
+        """Server sensors are always available."""
+        return True
 
 
 class SolarmanDeyeSensor(CoordinatorEntity[SolarmanDeyeCoordinator], SensorEntity):

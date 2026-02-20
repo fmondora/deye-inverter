@@ -198,12 +198,18 @@ class SolarmanV5Server:
         self._serial = serial
         self._on_data = on_data
         self._server: asyncio.AbstractServer | None = None
+        # Observable status for diagnostic sensors.
+        self.status: str = "Starting"
+        self.frames_received: int = 0
+        self.last_frame_time: str | None = None
+        self.logger_connected: bool = False
 
     async def start(self) -> None:
         """Start listening for connections."""
         self._server = await asyncio.start_server(
             self._handle_client, "0.0.0.0", self._port
         )
+        self.status = f"Listening on port {self._port}"
         _LOGGER.info(
             "Solarman V5 passive server listening on port %s", self._port
         )
@@ -221,7 +227,9 @@ class SolarmanV5Server:
     ) -> None:
         """Handle a single TCP connection from the data logger."""
         peer = writer.get_extra_info("peername")
-        _LOGGER.debug("Data logger connected from %s", peer)
+        self.logger_connected = True
+        self.status = f"Connected from {peer[0]}" if peer else "Connected"
+        _LOGGER.info("Data logger connected from %s", peer)
 
         try:
             while True:
@@ -251,16 +259,20 @@ class SolarmanV5Server:
                         )
                         continue
 
+                    self.frames_received += 1
+                    from datetime import datetime
+                    self.last_frame_time = datetime.now().isoformat(timespec="seconds")
+
                     if frame_type == FRAME_DATA:
                         regs = _extract_registers_from_payload(payload)
                         if regs:
-                            _LOGGER.debug(
+                            _LOGGER.info(
                                 "Received %d register values via push",
                                 len(regs),
                             )
                             self._on_data(regs)
                         else:
-                            _LOGGER.debug(
+                            _LOGGER.warning(
                                 "Data frame with no parseable registers "
                                 "(payload hex: %s)",
                                 payload.hex(),
@@ -268,9 +280,9 @@ class SolarmanV5Server:
                     elif frame_type in (FRAME_HEARTBEAT, FRAME_HELLO):
                         _LOGGER.debug("Heartbeat/hello from logger")
                     else:
-                        _LOGGER.debug(
-                            "Unknown frame type 0x%02x (payload hex: %s)",
-                            frame_type, payload.hex(),
+                        _LOGGER.info(
+                            "Frame type 0x%02x received (%d bytes payload)",
+                            frame_type, len(payload),
                         )
         except asyncio.TimeoutError:
             _LOGGER.debug("Logger connection timed out")
@@ -284,4 +296,6 @@ class SolarmanV5Server:
                 await writer.wait_closed()
             except Exception:  # noqa: BLE001
                 pass
-            _LOGGER.debug("Logger connection closed")
+            self.logger_connected = False
+            self.status = f"Listening on port {self._port}"
+            _LOGGER.info("Logger connection closed")

@@ -1,9 +1,10 @@
 """Config flow for Solarman Deye integration.
 
 Supports two setup paths:
-  - **Auto-discover**: scans the local network via UDP broadcast on port 48899
-    and lets the user pick a detected data logger.
-  - **Manual**: the user enters IP, serial number, port and slave ID by hand.
+  - **Push mode (recommended)**: the data logger pushes data to HA via
+    a passive TCP server.  Configure Server B on the logger's admin page.
+  - **Direct polling**: HA actively queries the logger on port 8899.
+    May not work if the cloud connection monopolises the logger.
 """
 
 from __future__ import annotations
@@ -12,7 +13,6 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-from pysolarmanv5 import PySolarmanV5
 
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.const import CONF_HOST
@@ -23,6 +23,7 @@ from .const import (
     CONF_BATTERY_CAPACITY,
     CONF_BATTERY_RATED_CYCLES,
     CONF_CO2_FACTOR,
+    CONF_MODE,
     CONF_PORT,
     CONF_SERIAL,
     CONF_SERVER_PORT,
@@ -35,12 +36,19 @@ from .const import (
     DEFAULT_SERVER_PORT,
     DEFAULT_SLAVE_ID,
     DOMAIN,
+    MODE_PUSH,
 )
-from .discovery import DiscoveredDevice, scan_network
 
 _LOGGER = logging.getLogger(__name__)
 
-MANUAL_DATA_SCHEMA = vol.Schema(
+PUSH_DATA_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_SERIAL): int,
+        vol.Optional(CONF_SERVER_PORT, default=DEFAULT_SERVER_PORT): int,
+    }
+)
+
+POLL_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_HOST): str,
         vol.Required(CONF_SERIAL): int,
@@ -50,96 +58,32 @@ MANUAL_DATA_SCHEMA = vol.Schema(
 )
 
 
-def _test_connection(host: str, serial: int, port: int, slave_id: int) -> bool:
-    """Try to read register 59 (running state) to validate the connection."""
-    import socket
-
-    # Step 1: raw TCP connectivity check
-    _LOGGER.debug(
-        "Testing TCP connectivity to %s:%s", host, port,
-    )
-    try:
-        test_sock = socket.create_connection((host, port), timeout=5)
-        test_sock.close()
-        _LOGGER.debug("TCP connection to %s:%s OK", host, port)
-    except OSError as sock_err:
-        _LOGGER.error(
-            "Cannot reach %s:%s — %s: %s. "
-            "Check that the data logger is on the same network as Home Assistant.",
-            host, port, type(sock_err).__name__, sock_err,
-        )
-        return False
-
-    # Step 2: Solarman V5 protocol test
-    client = None
-    try:
-        _LOGGER.debug(
-            "Testing Solarman V5 protocol (serial=%s, slave=%s)",
-            serial, slave_id,
-        )
-        client = PySolarmanV5(
-            host, serial, port=port, mb_slave_id=slave_id,
-            auto_reconnect=False, socket_timeout=15,
-        )
-        result = client.read_input_registers(register_addr=59, quantity=1)
-        _LOGGER.debug("Connection test OK — register 59 = %s", result)
-        return True
-    except Exception as err:  # noqa: BLE001
-        err_msg = str(err)
-        # AcknowledgeError means the data logger responded — the inverter
-        # is reachable but busy or in standby (common at night).  Treat
-        # any V5 Modbus exception *other* than a serial-number mismatch
-        # as a successful connectivity proof.
-        if "AcknowledgeError" in err_msg or "SlaveDeviceBusy" in err_msg:
-            _LOGGER.debug(
-                "Connection test OK (inverter in standby): %s", err_msg,
-            )
-            return True
-        _LOGGER.error(
-            "Solarman V5 protocol failed for %s:%s (serial=%s): %s: %s. "
-            "The serial number must match the data logger (NOT the inverter). "
-            "Check the sticker on the WiFi/Ethernet dongle.",
-            host, port, serial, type(err).__name__, err,
-        )
-        return False
-    finally:
-        if client is not None:
-            try:
-                client.disconnect()
-            except Exception:  # noqa: BLE001
-                pass
-
-
 class SolarmanDeyeConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Solarman Deye."""
 
     VERSION = 1
 
-    def __init__(self) -> None:
-        """Initialise flow state."""
-        self._discovered_devices: list[DiscoveredDevice] = []
-
     # ------------------------------------------------------------------
-    # Entry point — choose discover or manual
+    # Entry point — choose push or poll
     # ------------------------------------------------------------------
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Let the user choose between auto-discovery and manual entry."""
+        """Let the user choose between push mode and direct polling."""
         if user_input is not None:
-            if user_input["setup_method"] == "discover":
-                return await self.async_step_discover()
-            return await self.async_step_manual()
+            if user_input["setup_method"] == "push":
+                return await self.async_step_push()
+            return await self.async_step_poll()
 
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required("setup_method", default="discover"): vol.In(
+                    vol.Required("setup_method", default="push"): vol.In(
                         {
-                            "discover": "Auto-discover on network",
-                            "manual": "Manual configuration",
+                            "push": "Push mode — data logger sends data to HA (recommended)",
+                            "poll": "Direct polling — HA queries the data logger",
                         }
                     ),
                 }
@@ -147,89 +91,63 @@ class SolarmanDeyeConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------
-    # Auto-discovery via UDP broadcast
+    # Push mode — passive server
     # ------------------------------------------------------------------
 
-    async def async_step_discover(
+    async def async_step_push(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Scan the network and let the user pick a device."""
-        errors: dict[str, str] = {}
-
+        """Configure push mode (passive TCP server)."""
         if user_input is not None:
-            idx = int(user_input["device"])
-            device = self._discovered_devices[idx]
+            serial = user_input[CONF_SERIAL]
+            server_port = user_input.get(CONF_SERVER_PORT, DEFAULT_SERVER_PORT)
 
-            await self.async_set_unique_id(str(device.serial))
+            await self.async_set_unique_id(str(serial))
             self._abort_if_unique_id_configured()
 
-            ok = await self.hass.async_add_executor_job(
-                _test_connection, device.ip, device.serial, DEFAULT_PORT, DEFAULT_SLAVE_ID,
+            return self.async_create_entry(
+                title=f"Solarman Deye (push:{server_port})",
+                data={
+                    CONF_MODE: MODE_PUSH,
+                    CONF_SERIAL: serial,
+                    CONF_SERVER_PORT: server_port,
+                    CONF_HOST: "",
+                    CONF_PORT: DEFAULT_PORT,
+                    CONF_SLAVE_ID: DEFAULT_SLAVE_ID,
+                },
             )
-            if ok:
-                return self.async_create_entry(
-                    title=f"Solarman Deye ({device.ip})",
-                    data={
-                        CONF_HOST: device.ip,
-                        CONF_SERIAL: device.serial,
-                        CONF_PORT: DEFAULT_PORT,
-                        CONF_SLAVE_ID: DEFAULT_SLAVE_ID,
-                    },
-                )
-            errors["base"] = "cannot_connect"
-        else:
-            # First visit — run the scan
-            self._discovered_devices = await self.hass.async_add_executor_job(
-                scan_network
-            )
-
-        if not self._discovered_devices:
-            return self.async_abort(reason="no_devices_found")
-
-        device_map = {
-            str(i): f"{d.ip}  —  SN {d.serial}  ({d.mac})"
-            for i, d in enumerate(self._discovered_devices)
-        }
 
         return self.async_show_form(
-            step_id="discover",
-            data_schema=vol.Schema(
-                {vol.Required("device"): vol.In(device_map)}
-            ),
-            errors=errors,
+            step_id="push",
+            data_schema=PUSH_DATA_SCHEMA,
         )
 
     # ------------------------------------------------------------------
-    # Manual entry
+    # Direct polling (legacy)
     # ------------------------------------------------------------------
 
-    async def async_step_manual(
+    async def async_step_poll(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle manual configuration entry."""
+        """Configure direct polling mode."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
             await self.async_set_unique_id(str(user_input[CONF_SERIAL]))
             self._abort_if_unique_id_configured()
 
-            ok = await self.hass.async_add_executor_job(
-                _test_connection,
-                user_input[CONF_HOST],
-                user_input[CONF_SERIAL],
-                user_input[CONF_PORT],
-                user_input[CONF_SLAVE_ID],
+            # Skip connection test — it often fails due to cloud contention.
+            return self.async_create_entry(
+                title=f"Solarman Deye ({user_input[CONF_HOST]})",
+                data={
+                    CONF_MODE: "poll",
+                    **user_input,
+                },
             )
-            if ok:
-                return self.async_create_entry(
-                    title=f"Solarman Deye ({user_input[CONF_HOST]})",
-                    data=user_input,
-                )
-            errors["base"] = "cannot_connect"
 
         return self.async_show_form(
-            step_id="manual",
-            data_schema=MANUAL_DATA_SCHEMA,
+            step_id="poll",
+            data_schema=POLL_DATA_SCHEMA,
             errors=errors,
         )
 

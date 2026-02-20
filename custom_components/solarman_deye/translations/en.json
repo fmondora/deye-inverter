@@ -4,9 +4,8 @@
       "user": {
         "title": "Solarman Deye Inverter",
         "description": "How do you want to set up the inverter?",
-        "menu_options": {
-          "discover": "Auto-discover on network",
-          "manual": "Manual configuration"
+        "data": {
+          "setup_method": "Setup method"
         }
       },
       "discover": {

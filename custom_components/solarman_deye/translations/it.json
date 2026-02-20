@@ -4,9 +4,8 @@
       "user": {
         "title": "Inverter Solarman Deye",
         "description": "Come vuoi configurare l'inverter?",
-        "menu_options": {
-          "discover": "Ricerca automatica in rete",
-          "manual": "Configurazione manuale"
+        "data": {
+          "setup_method": "Metodo di configurazione"
         }
       },
       "discover": {

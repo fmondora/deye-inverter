@@ -50,11 +50,30 @@ MANUAL_DATA_SCHEMA = vol.Schema(
 
 def _test_connection(host: str, serial: int, port: int, slave_id: int) -> bool:
     """Try to read register 59 (running state) to validate the connection."""
+    import socket
+
+    # Step 1: raw TCP connectivity check
+    _LOGGER.debug(
+        "Testing TCP connectivity to %s:%s", host, port,
+    )
+    try:
+        test_sock = socket.create_connection((host, port), timeout=5)
+        test_sock.close()
+        _LOGGER.debug("TCP connection to %s:%s OK", host, port)
+    except OSError as sock_err:
+        _LOGGER.error(
+            "Cannot reach %s:%s — %s: %s. "
+            "Check that the data logger is on the same network as Home Assistant.",
+            host, port, type(sock_err).__name__, sock_err,
+        )
+        return False
+
+    # Step 2: Solarman V5 protocol test
     client = None
     try:
         _LOGGER.debug(
-            "Testing connection to %s:%s (serial=%s, slave=%s)",
-            host, port, serial, slave_id,
+            "Testing Solarman V5 protocol (serial=%s, slave=%s)",
+            serial, slave_id,
         )
         client = PySolarmanV5(
             host, serial, port=port, mb_slave_id=slave_id,
@@ -64,7 +83,12 @@ def _test_connection(host: str, serial: int, port: int, slave_id: int) -> bool:
         _LOGGER.debug("Connection test OK — register 59 = %s", result)
         return True
     except Exception as err:  # noqa: BLE001
-        _LOGGER.warning("Connection test failed: %s: %s", type(err).__name__, err)
+        _LOGGER.error(
+            "Solarman V5 protocol failed for %s:%s (serial=%s): %s: %s. "
+            "The serial number must match the data logger (NOT the inverter). "
+            "Check the sticker on the WiFi/Ethernet dongle.",
+            host, port, serial, type(err).__name__, err,
+        )
         return False
     finally:
         if client is not None:
@@ -91,9 +115,23 @@ class SolarmanDeyeConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Let the user choose between auto-discovery and manual entry."""
-        return self.async_show_menu(
+        if user_input is not None:
+            if user_input["setup_method"] == "discover":
+                return await self.async_step_discover()
+            return await self.async_step_manual()
+
+        return self.async_show_form(
             step_id="user",
-            menu_options=["discover", "manual"],
+            data_schema=vol.Schema(
+                {
+                    vol.Required("setup_method", default="discover"): vol.In(
+                        {
+                            "discover": "Auto-discover on network",
+                            "manual": "Manual configuration",
+                        }
+                    ),
+                }
+            ),
         )
 
     # ------------------------------------------------------------------

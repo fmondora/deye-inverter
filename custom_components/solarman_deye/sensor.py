@@ -168,7 +168,7 @@ class SolarmanDeyeSensor(CoordinatorEntity[SolarmanDeyeCoordinator], SensorEntit
         unit: str | None,
         device_class: SensorDeviceClass | None,
         state_class: SensorStateClass | None,
-        precision: int,
+        precision: int | None,
         icon: str | None = None,
     ) -> None:
         """Initialise the sensor."""
@@ -179,7 +179,8 @@ class SolarmanDeyeSensor(CoordinatorEntity[SolarmanDeyeCoordinator], SensorEntit
         self._attr_native_unit_of_measurement = unit
         self._attr_device_class = device_class
         self._attr_state_class = state_class
-        self._attr_suggested_display_precision = precision
+        if precision is not None:
+            self._attr_suggested_display_precision = precision
         if icon is not None:
             self._attr_icon = icon
         self._attr_device_info = DeviceInfo(

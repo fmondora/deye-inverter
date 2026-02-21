@@ -130,8 +130,8 @@ REGISTERS_ENERGY_TOTAL = [
 ]
 
 REGISTERS_STATUS = [
-    (59, "Running State", None, None, None, 1, 0, False),
-    (194, "Grid Connected Status", None, None, None, 1, 0, False),
+    (59, "Running State", None, None, None, 1, None, False),
+    (194, "Grid Connected Status", None, None, None, 1, None, False),
     (60, "Daily Active Energy", UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING, 0.1, 1, False),
 ]
 
